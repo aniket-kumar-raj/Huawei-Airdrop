@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Receiver Gallery - Palm Repeat</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #gallery {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  #gallery img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.4s ease-in-out;
+  }
+
+  #overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 22px;
+    color: #fff;
+    background: rgba(0,0,0,0.6);
+    z-index: 2;
+  }
+
+  video { display: none; }
+</style>
+</head>
+<body>
+<div id="gallery">
+  <img id="display" src="">
+  <div id="overlay">Show your palm to display image</div>
+</div>
+<video id="camera" autoplay playsinline></video>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrZDZ_M_DC97zLxLw4hgxwm_revSjwkMA",
+  authDomain: "project-jarvis-creators.firebaseapp.com",
+  databaseURL: "https://project-jarvis-creators-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "project-jarvis-creators",
+  storageBucket: "project-jarvis-creators.appspot.com",
+  messagingSenderId: "489774215647",
+  appId: "1:489774215647:web:496a71ec5b210c6aa6d46a",
+  measurementId: "G-P6ZFBKM2RR"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const mapping = {
+  "pic1": "https://lab4u.tech/pic1.jpg",
+  "pic2": "https://lab4u.tech/pic2.jpg",
+  "pic3": "https://lab4u.tech/pic3.jpg"
+};
+Object.values(mapping).forEach(src => new Image().src = src);
+
+const img = document.getElementById("display");
+const overlay = document.getElementById("overlay");
+
+let latestCode = null;
+onValue(ref(db, "gallery/selected"), snapshot => {
+  latestCode = snapshot.val();
+});
+
+window.getLatestCode = () => latestCode;
+window.mapping = mapping;
+window.img = img;
+window.overlay = overlay;
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script>
+const video = document.getElementById("camera");
+const hands = new Hands({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 0,
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6
+});
+
+let lastPalmState = false;
+
+// Show image whenever palm is detected, even if same image
+hands.onResults(results => {
+  const palmDetected = results.multiHandLandmarks?.length > 0;
+
+  if (palmDetected) {
+    // Only update UI when palm is newly raised
+    if (!lastPalmState) {
+      const code = window.getLatestCode();
+      if (code && window.mapping[code]) {
+        const newSrc = window.mapping[code];
+        img.style.opacity = 0;
+        img.src = newSrc;
+        img.onload = () => {
+          img.style.opacity = 1;
+          overlay.style.display = "none";
+        };
+      }
+    }
+    lastPalmState = true;
+  } else {
+    lastPalmState = false;
+    overlay.style.display = "flex";
+    img.style.opacity = 0;
+  }
+});
+
+const camera = new Camera(video, {
+  onFrame: async () => { await hands.send({ image: video }); },
+  width: 320,
+  height: 240
+});
+camera.start();
+</script>
+</body>
+</html>
